@@ -1,6 +1,43 @@
 # njit-scraper
 An application to scrape data from NJIT's course schedule at http://courseschedules.njit.edu/
 
+### Prerequisites
+
+The scraper is written in Go, so making sure you have latest version of the compiler on you system. 
+
+`https://golang.org/doc/install`
+
+Once you have Go on you machine and the `GOTPATH` environment variable setup. Copy this project to /src/njit-scraper. 
+
+Go's dependency management is currently pretty primitive so download these open source libraries first. 
+
+```
+
+go get github.com/PuerkitoBio/goquery
+
+go get github.com/lib/pq
+
+```
+
+The program expects a few constants to serve as login credential for a PosgresSQL database. So create a file `secrets.go` with 
+
+```Go
+package main
+
+const (
+	DbUser     = ""
+	DbHost     = ""
+	DbPassword = ""
+	DbName     = ""
+)
+
+``` 
+### Install
+
+`go install src/njit-scraper`
+
+
+
 #License 
 
 ```
