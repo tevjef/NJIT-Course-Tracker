@@ -1,0 +1,26 @@
+language: android
+
+jdk:
+ - oraclejdk7
+
+android:
+  components:
+    - build-tools-21.1.2
+    - extra-android-m2repository
+    - android-21
+    - android-18
+    - sys-img-armeabi-v7a-android-18
+
+notifications:
+  email: false
+
+script: "./gradlew build"
+
+before_script:
+- echo no | android create avd --force -n test -t android-21 --abi armeabi-v7a
+- emulator -avd test -no-skin -no-audio -no-window &
+- curl http://is.gd/android_wait_for_emulator > android-wait-for-emulator
+- chmod u+x android-wait-for-emulator
+- ./android-wait-for-emulator
+- adb shell input keyevent 82 &
+- chmod +x gradlew
