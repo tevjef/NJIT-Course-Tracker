@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 "net/http"
+	"strings"
 )
 
 var SubjectDoc *goquery.Document
@@ -109,13 +110,13 @@ func TestGetResolvedSemester(t *testing.T) {
 func TestGetHttp(t *testing.T) {
 	client := http.Client{}
 	req, err := http.NewRequest("GET", "http://catalog.njit.edu/ribbit/index.cgi?format=html&page=fsinjector.rjs&fullpage=true", nil)
-	req.Header.Add("Referer","http://catalog.njit.edu/search/?P=CS%20%20%20100")
+	req.Header.Add("Referer","http://catalog.njit.edu/search/?P=MATH%20337")
 	resp, err := client.Do(req)
 	checkError(err)
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	checkError(err)
-	fmt.Println(string(body))
+	fmt.Println(strings.Replace(string(body), "\\\"", "\"", -1))
 
 /*
 	doc, err := goquery.NewDocument("http://catalog.njit.edu/search/?P=CS  100")

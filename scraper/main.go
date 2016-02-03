@@ -180,10 +180,13 @@ func extractCourseDescription(selection *goquery.Selection) string {
 		return ""
 	}
 	result = substringBefore(result[3:], "<b")
-	if result[0] == "<" {
+	if string(result[0]) == "<" || strings.Contains(result, "at SISConnxService"){
 		return ""
 	}
-	return result
+	result = strings.Replace(result, "\\\"", "\"", -1)
+	doc, _ := goquery.NewDocumentFromReader(strings.NewReader(result))
+
+	return trim(doc.Text())
 }
 
 func extractSectionNum(selection *goquery.Selection) string {
