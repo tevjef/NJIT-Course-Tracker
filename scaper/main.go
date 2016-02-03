@@ -180,6 +180,9 @@ func extractCourseDescription(selection *goquery.Selection) string {
 		return ""
 	}
 	result = substringBefore(result[3:], "<b")
+	if result[0] == "<" {
+		return ""
+	}
 	return result
 }
 
