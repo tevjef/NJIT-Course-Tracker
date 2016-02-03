@@ -8,10 +8,9 @@ import (
 func insertSubject(subject Subject, db *sql.DB) string {
 	var subid sql.NullString
 
-	row := database.QueryRow(`UPDATE subject SET abbr = $1, name = $2, semester = $3 WHERE abbr = $4 AND semester = $5 RETURNING subid`,
+	row := database.QueryRow(`UPDATE subject SET abbr = $1, name = $2 WHERE abbr = $3 AND semester = $4 RETURNING subid`,
 		ToNullString(subject.SubjectId),
 		ToNullString(subject.SubjectName),
-		ToNullString(subject.Semester.String()),
 		ToNullString(subject.SubjectId),
 		ToNullString(subject.Semester.String()))
 	row.Scan(&subid)
@@ -20,9 +19,9 @@ func insertSubject(subject Subject, db *sql.DB) string {
 
 	if (subid.String == "") {
 		row := database.QueryRow(`INSERT INTO subject (abbr, name, semester) VALUES($1, $2, $3) RETURNING subid`,
-			ToNullString(subject.SubjectId),
-			ToNullString(subject.SubjectName),
-			ToNullString(subject.Semester.String()))
+		ToNullString(subject.SubjectId),
+		ToNullString(subject.SubjectName),
+		ToNullString(subject.Semester.String()))
 		err := row.Scan(&subid)
 		checkError(err)
 
@@ -40,14 +39,18 @@ func insertCourseJSON(courselist []Course, subid string, db *sql.DB) {
 		fmt.Println(err)
 	}
 	json := string(b[:])
+	if len(json) == 0 {
+		panic(fmt.Sprintf("Course json empty::subid %s", subid))
+	}
 
 	row := database.QueryRow(`UPDATE subject SET data_json = $1 WHERE subid = $2 RETURNING subid`,
-		ToNullString(json),
-		Atoi64(subid))
+	ToNullString(json),
+	Atoi64(subid))
 	err = row.Scan(&id)
 	checkError(err)
-	fmt.Printf("Rows affected on update courrse json %s\n",id.String)
+	fmt.Printf("Rows affected on update course json %s\n",id.String)
 }
+
 func insertCourse(course Course, subid string, index int, db *sql.DB) string {
 	var cid sql.NullString
 
@@ -57,8 +60,8 @@ func insertCourse(course Course, subid string, index int, db *sql.DB) string {
 	}
 	json := string(b[:])
 
-	row := database.QueryRow(`UPDATE course SET subid = $1, name = $2, number = $3,
-	description = $4, data_json = $5 FROM subject WHERE subject.subid = course.subid AND
+	row := database.QueryRow(`UPDATE course SET subid = $1, name = $2, number = $3, description = $4, data_json = $5 FROM subject WHERE
+	subject.subid = course.subid AND
 	subject.subid = $6 AND course.index = $7 RETURNING cid`,
 		Atoi64(subid),
 		ToNullString(course.CourseName),

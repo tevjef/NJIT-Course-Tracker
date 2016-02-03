@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 	"strconv"
+"net/http"
 )
 
 var database *sql.DB
@@ -26,6 +27,7 @@ const (
 func init() {
 	dbInfo := fmt.Sprintf("postgres://%s:%s@%s:5432/%s",
 		DbUser, DbPassword, DbHost, DbName)
+
 	db, err := sql.Open("postgres", dbInfo)
 	checkError(err)
 	database = db
@@ -45,6 +47,7 @@ func main() {
 			fmt.Printf("%#v", subject)
 			subid := insertSubject(subject, database)
 			wg.Add(1)
+
 			go func(sub Subject) {
 				courselist := getCourses(sub)
 				insertCourseJSON(courselist, subid, database)
@@ -60,12 +63,10 @@ func main() {
 						}
 					}
 					b, err := json.Marshal(course)
-					if err != nil {
-						fmt.Println(err)
-						return
-					}
-					ioutil.WriteFile("courses/" + subject.SubjectId + "-" + subject.SubjectName +"-"+ subject.Semester.String()+
+					checkError(err)
+					err = ioutil.WriteFile("courses/" + sub.SubjectId + "-" + strings.Replace(strings.Replace(sub.SubjectName, " ", "-", -1), "/", "-", -1) + "-" + sub.Semester.String() +
 					".json", b, os.ModePerm)
+					checkError(err)
 				}
 				wg.Done()
 			}(subject)
@@ -89,10 +90,12 @@ func getSubjectList(semester Semester) []Subject {
 
 func extractSubjectList(doc *goquery.Document, semester Semester) (subjectList []Subject) {
 	doc.Find(".dashed_wrapper a").Each(func(i int, s *goquery.Selection) {
-		subjectList = append(subjectList, Subject{
+		subject := Subject{
 			SubjectId:   trim(substringBefore(s.Text(), "-")),
 			SubjectName: trim(substringAfter(s.Text(), "-")),
-			Semester:semester})
+			Semester:semester}
+		fmt.Printf("FOUND SUBJECT in Semester %#v :: %#v", semester, subject)
+		subjectList = append(subjectList, subject)
 	})
 	return
 }
@@ -103,35 +106,32 @@ func getCourses(subject Subject) (courses []Course) {
 	strconv.Itoa(subject.Semester.Year), subject.Semester.Season.String(), subject.SubjectId)
 	fmt.Println("Url: ", url)
 	doc, err := goquery.NewDocument(url)
-	if err != nil {
-		fmt.Printf("%s", err)
-		os.Exit(1)
-	}
+	checkError(err)
 
 	return extractCourseList(doc)
 }
 
 func extractCourseList(doc *goquery.Document) (courses []Course) {
-	doc.Find(".subject_tablewrapper_table tbody").Children().Each(func(i int, s *goquery.Selection) {
-		if i > 0 {
-			c := Course{
-				CourseNum:         extractCourseNum(s),
-				CourseName:        extractCourseName(s),
-				CourseDescription: extractCourseDescription(s),
-				Section:           getSections(s),
-			}
-
-			if c.CourseNum != "" {
-				courses = append(courses, c)
-			}
+	doc.Find(".subject_wrapper").Each(func(i int, s *goquery.Selection) {
+		course := Course{
+			CourseNum:         extractCourseNum(s),
+			CourseName:        extractCourseName(s),
+			CourseDescription: extractCourseDescription(s),
+			Section:           getSections(s),
 		}
+		fmt.Printf("FOUND Course in document :: %#v", course)
+
+		if course.CourseNum != "" {
+			courses = append(courses, course)
+		}
+
 	})
 	return
 }
 
 func getSections(s *goquery.Selection) (sections []Section) {
 	s.Find(".sectionRow").Each(func(i int, s *goquery.Selection) {
-		sections = append(sections, Section{
+		section := Section{
 			SectionNum:   extractSectionNum(s),
 			CallNum:      extractCallNum(s),
 			MeetingTimes: extractTimes(s),
@@ -141,21 +141,46 @@ func getSections(s *goquery.Selection) (sections []Section) {
 			Instructor:   extractInstructor(s),
 			BookUrl:      extractBookUrl(s),
 			Credits:      extractCredits(s),
-		})
+		}
+
+		fmt.Printf("FOUND Section in document :: %#v", section)
+
+		sections = append(sections, section)
 	})
 	return
 }
 
 func extractCourseName(selection *goquery.Selection) string {
-	return trim(substringBefore(substringAfter(selection.Find(".courseName").Text(), "-"), "("))
+	return trim(substringAfter(selection.Find(".catalogdescription").Text(), "-"))
 }
 
 func extractCourseNum(selection *goquery.Selection) string {
-	return trim(substringAfterLast(trim(substringBefore(selection.Find(".courseName").Text(), "-")), " "))
+	return trim(substringAfterLast(trim(substringBefore(selection.Find(".catalogdescription").Text(), "-")), " "))
 }
 
 func extractCourseDescription(selection *goquery.Selection) string {
-	return trim(selection.Find(".tooltip").Text())
+	url := trim(fmt.Sprintln(selection.Find(".catalogdescription a").AttrOr("href", "")))
+	fmt.Println("LOGGING URL", url)
+	client := http.Client{}
+	req, _ := http.NewRequest("GET", "http://catalog.njit.edu/ribbit/index.cgi?format=html&page=fsinjector.rjs&fullpage=true", nil)
+	req.Header.Add("Referer",url)
+	resp, err := client.Do(req)
+	if err != nil {
+
+		return ""
+	}
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+
+	body, _ := ioutil.ReadAll(resp.Body)
+	//checkError(err)
+	result := substringAfter(string(body), "courseblockdesc")
+	if len(result) < 4 {
+		return ""
+	}
+	result = substringBefore(result[3:], "<b")
+	return result
 }
 
 func extractSectionNum(selection *goquery.Selection) string {
@@ -167,7 +192,7 @@ func extractCallNum(selection *goquery.Selection) string {
 }
 
 func extractBookUrl(selection *goquery.Selection) string {
-	return trim(selection.Find(".call a").AttrOr("href", ""))
+	return strings.Replace(trim(selection.Find(".call a").AttrOr("href", "")), " ", "%20", -1)
 }
 
 func extractRoomNum(selection *goquery.Selection) string {
@@ -285,12 +310,12 @@ type (
 	Section struct {
 		SectionNum   string        `json:"section_number,omitempty"`
 		CallNum      string        `json:"call_number,omitempty"`
+		MeetingTimes []MeetingTime `json:"meeting_time,omitempty"`
 		Status       string        `json:"status,omitempty"`
 		Max          float64        `json:"max,omitempty"`
 		Now          float64        `json:"now,omitempty"`
 		Instructor   string        `json:"instructor,omitempty"`
 		BookUrl      string        `json:"book_url,omitempty"`
-		MeetingTimes []MeetingTime `json:"meeting_time,omitempty"`
 		Credits      string        `json:"credits,omitempty"`
 	}
 

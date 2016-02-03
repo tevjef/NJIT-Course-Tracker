@@ -10,6 +10,7 @@ import (
 	"os"
 	"testing"
 	"time"
+"net/http"
 )
 
 var SubjectDoc *goquery.Document
@@ -76,7 +77,7 @@ func TestExtractSubjectList(t *testing.T) {
 func TestExtractCourseName(t *testing.T) {
 	setup()
 	result := extractCourseName(CourseDoc.Find(".subject_wrapper").First())
-	fmt.Print(result)
+	log.Print(result)
 	assert.True(t, len(result) > 0)
 }
 
@@ -84,7 +85,7 @@ func TestExtractCourseNum(t *testing.T) {
 	setup()
 	expected := "100"
 	result := extractCourseNum(CourseDoc.Find(".subject_wrapper").First())
-	fmt.Print(result)
+	log.Print(result)
 	assert.Equal(t, expected, result)
 }
 
@@ -105,10 +106,30 @@ func TestGetResolvedSemester(t *testing.T) {
 
 }
 
+func TestGetHttp(t *testing.T) {
+	client := http.Client{}
+	req, err := http.NewRequest("GET", "http://catalog.njit.edu/ribbit/index.cgi?format=html&page=fsinjector.rjs&fullpage=true", nil)
+	req.Header.Add("Referer","http://catalog.njit.edu/search/?P=CS%20%20%20100")
+	resp, err := client.Do(req)
+	checkError(err)
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	checkError(err)
+	fmt.Println(string(body))
+
+/*
+	doc, err := goquery.NewDocument("http://catalog.njit.edu/search/?P=CS  100")
+	checkError(err)
+
+	fmt.Println(doc.Text())
+*/
+
+}
+
 func TestExtractCourseDescription(t *testing.T) {
 	setup()
 	result := extractCourseDescription(CourseDoc.Find(".subject_wrapper").First())
-	fmt.Print(result)
+	log.Print(result)
 	assert.True(t, len(result) > 0)
 }
 
@@ -116,7 +137,7 @@ func TestGetCourses(t *testing.T) {
 	setup()
 	expected := 74
 	result := getCourses(Subject{SubjectId:"CS", SubjectName:"Computer Science"})
-	fmt.Printf("%#v", result)
+	log.Printf("%#v", result)
 	assert.Equal(t, expected, len(result))
 
 	b, err := json.Marshal(result)
@@ -129,23 +150,23 @@ func TestGetCourses(t *testing.T) {
 
 func TestGetSections(t *testing.T) {
 	setup()
-	expected := 2
-	result := getSections(CourseDoc.Find(".subject_tablewrapper_table tbody tr").Siblings().Eq(1))
+	expected := 11
+	result := getSections(CourseDoc.Find(".subject_wrapper").Eq(1))
 	fmt.Printf("%#v", result)
 	assert.Equal(t, expected, len(result))
 }
 
 func TestExtractSectionNum(t *testing.T) {
 	setup()
-	expected := "001"
+	expected := "002"
 	result := extractSectionNum(CourseDoc.Find(".subject_wrapper .sectionRow").First())
-	fmt.Print(result)
+	log.Print(result)
 	assert.Equal(t, expected, result)
 }
 
 func TestExtractCallNum(t *testing.T) {
 	setup()
-	expected := "91357"
+	expected := "11359"
 	result := extractCallNum(CourseDoc.Find(".subject_wrapper .sectionRow").First())
 	fmt.Print(result)
 	assert.Equal(t, expected, result)
@@ -153,7 +174,7 @@ func TestExtractCallNum(t *testing.T) {
 
 func TestExtractBookUrl(t *testing.T) {
 	setup()
-	expected := "http://www.bkstr.com/webapp/wcs/stores/servlet/booklookServlet?bookstore_id-1=584&term_id-1=fall 2015&crn-1=91357"
+	expected := "http://www.bkstr.com/webapp/wcs/stores/servlet/booklookServlet?bookstore_id-1=584&term_id-1=spring%202016&crn-1=11359"
 	result := extractBookUrl(CourseDoc.Find(".subject_wrapper .sectionRow").First())
 	fmt.Print(result)
 	assert.Equal(t, expected, result)
@@ -161,15 +182,15 @@ func TestExtractBookUrl(t *testing.T) {
 
 func TestExtractRoomNum(t *testing.T) {
 	setup()
-	expected := "GITC2400\nGITC1100"
-	result := extractRoomNum(CourseDoc.Find(".subject_tablewrapper_table tbody tr").Siblings().Eq(3))
+	expected := "GITC1100\nGITC2400"
+	result := extractRoomNum(CourseDoc.Find(".subject_wrapper").Eq(1))
 	fmt.Print(result)
 	assert.Equal(t, expected, result)
 }
 
 func TestExtractMeetingTime(t *testing.T) {
 	setup()
-	result := extractTimes(CourseDoc.Find(".subject_tablewrapper_table tbody tr").Siblings().Eq(3))
+	result := extractTimes(CourseDoc.Find(".subject_wrapper").Eq(1))
 	log.Println(result)
 	//assert.Equal(t, expected, result)
 }
@@ -198,7 +219,7 @@ func TestExtractStatus(t *testing.T) {
 
 func TestExtractMaxSize(t *testing.T) {
 	setup()
-	expected := "27"
+	expected := float64(27)
 	result := extractMaxSize(CourseDoc.Find(".subject_wrapper .sectionRow").First())
 	fmt.Print(result)
 	assert.Equal(t, expected, result)
@@ -206,7 +227,7 @@ func TestExtractMaxSize(t *testing.T) {
 
 func TestExtractNowSize(t *testing.T) {
 	setup()
-	expected := "27"
+	expected := float64(27)
 	result := extractNowSize(CourseDoc.Find(".subject_wrapper .sectionRow").First())
 	fmt.Print(result)
 	assert.Equal(t, expected, result)
